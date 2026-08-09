@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cefni Reservoir — Water Quality Dashboard Preview</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#161f2b; --panel2:#1c2733; --text:#e8edf2; --muted:#93a1b0;
+    --chloro:#2e7d32; --turb:#8d6e63; --solids:#607d8b;
+    --lse:#1565c0; --rbf:#ef6c00; --ann:#2e7d32;
+    --accent:#4fc3f7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{padding:28px 32px 16px;border-bottom:1px solid #263241;}
+  header h1{margin:0 0 4px;font-size:22px;font-weight:600;}
+  header p{margin:0;color:var(--muted);font-size:14px;}
+  .badge{display:inline-block;background:#1e2c3a;color:var(--accent);border:1px solid #2c4359;
+         padding:3px 10px;border-radius:12px;font-size:11px;margin-top:8px;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;padding:20px 32px 0;}
+  .card{background:var(--panel);border:1px solid #263241;border-radius:10px;padding:16px 18px;}
+  .card .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;}
+  .card .value{font-size:26px;font-weight:700;margin-top:6px;}
+  .card .sub{color:var(--muted);font-size:12px;margin-top:4px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:20px 32px 32px;}
+  .full{grid-column:1 / -1;}
+  .panel{background:var(--panel);border:1px solid #263241;border-radius:10px;padding:16px 18px;}
+  .panel h3{margin:0 0 12px;font-size:14px;font-weight:600;color:var(--text);}
+  canvas{max-height:280px;}
+  footer{padding:16px 32px 32px;color:var(--muted);font-size:11.5px;border-top:1px solid #263241;margin-top:8px;}
+  @media (max-width:820px){.grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛰️ Cefni Reservoir — Water Quality Monitoring Dashboard</h1>
+  <p>Anglesey, Wales, UK &nbsp;·&nbsp; Predicting water quality from Landsat-8 satellite reflectance</p>
+  <span class="badge">Synthetic dataset — safe for public portfolio use</span>
+</header>
+
+<div class="cards" id="cards"></div>
+
+<div class="grid">
+  <div class="panel full">
+    <h3>5-Year Trend — Chlorophyll-a, Turbidity, Suspended Solids</h3>
+    <canvas id="trendChart"></canvas>
+  </div>
+  <div class="panel">
+    <h3>Seasonal Average by Parameter</h3>
+    <canvas id="seasonChart"></canvas>
+  </div>
+  <div class="panel">
+    <h3>Model Accuracy — Mean Relative Error</h3>
+    <canvas id="modelChart"></canvas>
+  </div>
+</div>
+
+<footer>
+  Portfolio project adapted from PhD research (University of Rome "La Sapienza"). Dataset is synthetic,
+  calibrated to reproduce the seasonal patterns and error magnitudes reported in the original study —
+  no proprietary Welsh Water / Hamdden Ltd data is included. Full pipeline: github.com — see /notebooks.
+</footer>
+
+<script>
+const DATA = {"timeseries": {"dates": ["2013-01", "2013-02", "2013-03", "2013-04", "2013-05", "2013-06", "2013-07", "2013-08", "2013-09", "2013-10", "2013-11", "2013-12", "2014-01", "2014-02", "2014-03", "2014-04", "2014-05", "2014-06", "2014-07", "2014-08", "2014-09", "2014-10", "2014-11", "2014-12", "2015-01", "2015-02", "2015-03", "2015-04", "2015-05", "2015-06", "2015-07", "2015-08", "2015-09", "2015-10", "2015-11", "2015-12", "2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06", "2016-07", "2016-08", "2016-09", "2016-10", "2016-11", "2016-12", "2017-01", "2017-02", "2017-03", "2017-04", "2017-05", "2017-06", "2017-07", "2017-08", "2017-09", "2017-10", "2017-11", "2017-12"], "chlorophyll": [10.85, 10.86, 11.88, 13.63, 14.84, 18.92, 19.57, 23.21, 13.43, 16.44, 12.17, 10.27, 8.92, 10.05, 10.75, 16.46, 9.46, 28.57, 16.77, 23.42, 11.57, 15.02, 14.23, 9.41, 10.11, 11.94, 10.21, 12.64, 17.21, 17.09, 12.81, 15.92, 10.12, 15.69, 17.12, 9.95, 10.56, 10.42, 14.82, 12.19, 14.17, 19.37, 20.35, 15.88, 15.57, 11.89, 17.93, 8.94, 11.11, 10.95, 12.45, 7.56, 16.78, 23.17, 12.82, 22.61, 14.78, 12.6, 18.46, 10.06], "turbidity": [1.83, 4.27, 4.62, 5.26, 4.64, 5.49, 3.96, 3.26, 5.77, 4.35, 3.3, 3.65, 3.67, 4.92, 4.93, 5.69, 5.31, 6.84, 6.65, 5.74, 6.39, 4.11, 6.36, 2.44, 4.66, 1.61, 4.89, 4.33, 4.2, 2.75, 7.5, 7.54, 4.51, 4.93, 4.32, 2.87, 5.79, 5.9, 5.26, 4.91, 7.09, 5.32, 3.28, 3.48, 5.39, 4.94, 5.86, 4.43, 4.46, 5.08, 5.45, 3.48, 4.73, 4.24, 5.3, 5.32, 7.14, 5.29, 6.08, 5.43], "solids": [1.21, 4.88, 2.81, 4.46, 2.53, 4.97, 4.37, 4.19, 3.65, 4.25, 4.56, 3.1, 5.08, 0.42, 3.69, 4.33, 3.28, 3.91, 4.79, 6.17, 2.94, 1.98, 4.27, 5.69, 2.48, 3.13, 3.15, 4.17, 3.75, 4.46, 2.35, 3.06, 3.49, 4.05, 2.74, 2.46, 0.2, 0.64, 6.21, 2.87, 5.02, 3.6, 5.57, 6.6, 4.62, 6.39, 5.28, 5.21, 1.02, 3.57, 3.5, 4.53, 2.56, 5.54, 3.22, 2.69, 7.07, 2.7, 2.41, 1.49], "season": ["Winter", "Winter", "Spring", "Spring", "Spring", "Summer", "Summer", "Summer", "Autumn", "Autumn", "Autumn", "Winter", "Winter", "Winter", "Spring", "Spring", "Spring", "Summer", "Summer", "Summer", "Autumn", "Autumn", "Autumn", "Winter", "Winter", "Winter", "Spring", "Spring", "Spring", "Summer", "Summer", "Summer", "Autumn", "Autumn", "Autumn", "Winter", "Winter", "Winter", "Spring", "Spring", "Spring", "Summer", "Summer", "Summer", "Autumn", "Autumn", "Autumn", "Winter", "Winter", "Winter", "Spring", "Spring", "Spring", "Summer", "Summer", "Summer", "Autumn", "Autumn", "Autumn", "Winter"]}, "seasonal": {"labels": ["Spring", "Summer", "Autumn", "Winter"], "chlorophyll": [13.0, 19.37, 14.47, 10.29], "turbidity": [4.99, 5.11, 5.25, 4.07], "solids": [3.79, 4.37, 4.03, 2.71]}, "models": {"labels": ["Chlorophyll-a", "Turbidity", "Suspended Solids"], "LSE": [0.209, 0.598, 0.366], "RBF": [0.196, 0.392, 0.305], "ANN": [0.188, 0.385, 0.328]}, "summary": {"n_samples": 60, "date_range": ["2013-01", "2017-12"], "pca_variance_explained": [62.3, 32.9, 4.8], "best_model_per_variable": [{"variable": "chlorophyll_a_ugL", "model": "ANN", "relative_error": 0.1875033478128371}, {"variable": "suspended_solids_mgL", "model": "ANN", "relative_error": 0.38535255182867445}, {"variable": "turbidity_ntu", "model": "RBF", "relative_error": 0.3052918757221495}], "overall_mean_relative_error": 0.3296}};
+
+const cardsEl = document.getElementById('cards');
+const avgC = (DATA.timeseries.chlorophyll.reduce((a,b)=>a+b,0)/DATA.timeseries.chlorophyll.length).toFixed(1);
+const avgT = (DATA.timeseries.turbidity.reduce((a,b)=>a+b,0)/DATA.timeseries.turbidity.length).toFixed(1);
+const avgS = (DATA.timeseries.solids.reduce((a,b)=>a+b,0)/DATA.timeseries.solids.length).toFixed(1);
+const best = DATA.summary.best_model_per_variable.map(r => `${r.model} (${r.variable.split('_')[0]})`).join(', ');
+
+cardsEl.innerHTML = `
+  <div class="card"><div class="label">Avg Chlorophyll-a</div><div class="value" style="color:var(--chloro)">${avgC} µg/L</div><div class="sub">Algal bloom indicator</div></div>
+  <div class="card"><div class="label">Avg Turbidity</div><div class="value" style="color:var(--turb)">${avgT} NTU</div><div class="sub">Water clarity</div></div>
+  <div class="card"><div class="label">Avg Suspended Solids</div><div class="value" style="color:var(--solids)">${avgS} mg/L</div><div class="sub">Sediment load</div></div>
+  <div class="card"><div class="label">Samples analysed</div><div class="value">${DATA.summary.n_samples}</div><div class="sub">${DATA.summary.date_range[0]} → ${DATA.summary.date_range[1]}</div></div>
+`;
+
+Chart.defaults.color = '#93a1b0';
+Chart.defaults.borderColor = '#263241';
+Chart.defaults.font.family = "'Segoe UI',Arial,sans-serif";
+
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: DATA.timeseries.dates,
+    datasets: [
+      {label:'Chlorophyll-a (µg/L)', data: DATA.timeseries.chlorophyll, borderColor:'#2e7d32', backgroundColor:'transparent', tension:.3, pointRadius:0, borderWidth:2},
+      {label:'Turbidity (NTU)', data: DATA.timeseries.turbidity, borderColor:'#8d6e63', backgroundColor:'transparent', tension:.3, pointRadius:0, borderWidth:2},
+      {label:'Suspended Solids (mg/L)', data: DATA.timeseries.solids, borderColor:'#607d8b', backgroundColor:'transparent', tension:.3, pointRadius:0, borderWidth:2},
+    ]
+  },
+  options: {
+    responsive:true,
+    plugins:{legend:{position:'top', labels:{boxWidth:12}}},
+    scales:{x:{ticks:{maxTicksLimit:12}}, y:{beginAtZero:true}}
+  }
+});
+
+new Chart(document.getElementById('seasonChart'), {
+  type: 'bar',
+  data: {
+    labels: DATA.seasonal.labels,
+    datasets: [
+      {label:'Chlorophyll-a', data: DATA.seasonal.chlorophyll, backgroundColor:'#2e7d32'},
+      {label:'Turbidity', data: DATA.seasonal.turbidity, backgroundColor:'#8d6e63'},
+      {label:'Suspended Solids', data: DATA.seasonal.solids, backgroundColor:'#607d8b'},
+    ]
+  },
+  options: { responsive:true, plugins:{legend:{position:'top', labels:{boxWidth:12}}} }
+});
+
+new Chart(document.getElementById('modelChart'), {
+  type: 'bar',
+  data: {
+    labels: DATA.models.labels,
+    datasets: [
+      {label:'LSE (Linear)', data: DATA.models.LSE, backgroundColor:'#1565c0'},
+      {label:'RBF (SVR)', data: DATA.models.RBF, backgroundColor:'#ef6c00'},
+      {label:'ANN (MLP)', data: DATA.models.ANN, backgroundColor:'#2e7d32'},
+    ]
+  },
+  options: { responsive:true, plugins:{legend:{position:'top', labels:{boxWidth:12}}} }
+});
+</script>
+</body>
+</html>
