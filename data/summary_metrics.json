@@ -1,0 +1,30 @@
+{
+  "n_samples": 60,
+  "date_range": [
+    "2013-01",
+    "2017-12"
+  ],
+  "pca_variance_explained": [
+    62.3,
+    32.9,
+    4.8
+  ],
+  "best_model_per_variable": [
+    {
+      "variable": "chlorophyll_a_ugL",
+      "model": "ANN",
+      "relative_error": 0.1875033478128371
+    },
+    {
+      "variable": "suspended_solids_mgL",
+      "model": "ANN",
+      "relative_error": 0.38535255182867445
+    },
+    {
+      "variable": "turbidity_ntu",
+      "model": "RBF",
+      "relative_error": 0.3052918757221495
+    }
+  ],
+  "overall_mean_relative_error": 0.3296
+}
